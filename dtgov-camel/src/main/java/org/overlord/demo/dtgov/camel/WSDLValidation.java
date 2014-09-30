@@ -101,7 +101,7 @@ public class WSDLValidation extends Main {
         public void process(Exchange exchange) throws Exception {
             PullRequest pullRequest = exchange.getIn().getBody(PullRequest.class);
             String notification = "INVALID PULL REQUEST: Pull request #" + pullRequest.getNumber()
-                    + " failed validation!  " + pullRequest.getIssueUrl();
+                    + " failed validation!  " + pullRequest.getHtmlUrl();
             exchange.getIn().setBody(notification);
 
             // needed for GitHub comment
@@ -114,7 +114,7 @@ public class WSDLValidation extends Main {
         public void process(Exchange exchange) throws Exception {
             PullRequest pullRequest = exchange.getIn().getBody(PullRequest.class);
             String notification = "VALID PULL REQUEST: Pull request #" + pullRequest.getNumber()
-                    + " passed validation!  " + pullRequest.getIssueUrl();
+                    + " passed validation!  " + pullRequest.getHtmlUrl();
             exchange.getIn().setBody(notification);
 
             // needed for GitHub comment
