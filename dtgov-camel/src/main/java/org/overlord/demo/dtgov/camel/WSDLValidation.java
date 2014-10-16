@@ -18,9 +18,10 @@ import org.eclipse.egit.github.core.PullRequest;
  * 4.) DTGov automatically rejects the pull request.
  * 5.) DTGov posts a Tweet, describing the failure, to a central account.
  *     (Theoretically, this could also be configured to Tweet *at* a user, send a direct message, etc.)
- * 6.) The developer corrects the WSDL and submits a new pull request.
- * 7.) DTGov successfully validates the WSDL.
- * 8.) DTGov comments on the pull request, mentioning that it's valid.
+ * 6.) DTGov opens a new JIRA issue, referencing the failure.
+ * 7.) The developer corrects the WSDL and submits a new pull request.
+ * 8.) DTGov successfully validates the WSDL.
+ * 9.) DTGov comments on the pull request, mentioning that it's valid.
  * 
  * To run the demo:
  * 
@@ -29,12 +30,13 @@ import org.eclipse.egit.github.core.PullRequest;
  * 2.) Fork https://github.com/overlordtester/camel-github-test, commit *anything*, and create a pull request.
  *     IMPORTANT: Title the pull request "invalid". This will tell the fake validator to take the error path.
  *     The commit itself is irrelevant.
- * 3.) Verify that DTGov commented on the pull request, closed it, and Tweeted about it.
+ * 3.) Verify that DTGov commented on the pull request, closed it, Tweeted about it, and opened a JIRA.
  * 4.) Repeat #3, but title it anything *other than* "invalid".
  * 5.) Verify that DTGov commented on the pull request.
  * 
  * GitHub: username "overlordtester", password "overlord1!"
  * Twitter: username "overlordtester", password "overlord1!", keys created through https://apps.twitter.com/app/6988265
+ * JIRA: username "overlordtest1", password "overlordtest1", http://overlordtest1.atlassian.net
  * 
  * @author Brett Meyer
  */
@@ -56,6 +58,18 @@ public class WSDLValidation extends Main {
     private static final String TWITTER_PARAMS = "?consumerKey=" + TWITTER_CONSUMER_KEY + "&consumerSecret="
             + TWITTER_CONSUMER_SECRET + "&accessToken=" + TWITTER_ACCESS_TOKEN
             + "&accessTokenSecret=" + TWITTER_ACCESS_TOKEN_SECRET;
+    
+    private static final String JIRA_URL = "https://overlordtest1.atlassian.net";
+    private static final String JIRA_USERNAME = "overlordtest1";
+    private static final String JIRA_PASSWORD = "overlordtest1";
+    private static final String JIRA_PROJECT_KEY = "TEST";
+    // Note: 1 is generally "Bug".  But, if you have the issue types customized in your instance, log in, go to
+    // the administration area, and click "Issue Types".  If you hover your mouse over each type in the left sidebar,
+    // the ID will be in the URL.
+    private static final int JIRA_ISSUE_TYPE_ID = 1;
+    
+    private static final String JIRA_PARAMS = "?serverUrl=" + JIRA_URL + "&username=" + JIRA_USERNAME
+            + "&password=" + JIRA_PASSWORD;
 
     public static class WSDLValidationRouteBuilder extends RouteBuilder {
         @Override
@@ -81,7 +95,9 @@ public class WSDLValidation extends Main {
                             // comment on PR
                             .to("github://pullRequestComment" + GITHUB_PARAMS)
                             // tweet
-                            .to("twitter://timeline/user" + TWITTER_PARAMS);
+                            .to("twitter://timeline/user" + TWITTER_PARAMS)
+                            // new JIRA issue
+                            .to("jira://newIssue" + JIRA_PARAMS);
 
             // valid pull request: comment on PR
             from("direct:validPullRequest")
@@ -102,9 +118,15 @@ public class WSDLValidation extends Main {
         @Override
         public void process(Exchange exchange) throws Exception {
             PullRequest pullRequest = exchange.getIn().getBody(PullRequest.class);
-            String notification = "INVALID PULL REQUEST: Pull request #" + pullRequest.getNumber()
-                    + " failed validation!  " + pullRequest.getHtmlUrl();
+            String title = "INVALID PULL REQUEST: Pull request #" + pullRequest.getNumber();
+            String notification = title + " failed validation!  " + pullRequest.getHtmlUrl();
+            
             exchange.getIn().setBody(notification);
+            
+            // set headers necessary for a new JIRA ticket
+            exchange.getIn().setHeader("ProjectKey", JIRA_PROJECT_KEY);
+            exchange.getIn().setHeader("IssueTypeId", JIRA_ISSUE_TYPE_ID);
+            exchange.getIn().setHeader("IssueSummary", title);
         }
     }
 
